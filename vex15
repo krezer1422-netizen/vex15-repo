@@ -1,0 +1,188 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+final class Vex15
+{
+    private const PREFIX = 'VEX15_';
+    private const MAX_LAYERS = 20;
+
+    public static function encode(string $text): string
+    {
+        $urlEncoded = rawurlencode($text);
+        $base64 = base64_encode($urlEncoded);
+        $reversed = strrev($base64);
+        $swapped = str_replace(['A', 'E'], ['∆', '∑'], $reversed);
+
+        return self::PREFIX . $swapped;
+    }
+
+    public static function decode(string $vexText): string
+    {
+        $current = trim($vexText);
+        $layers = 0;
+
+        while (strpos($current, self::PREFIX) === 0) {
+            $core = substr($current, strlen(self::PREFIX));
+            $unswapped = str_replace(['∆', '∑'], ['A', 'E'], $core);
+            $reversedBack = strrev($unswapped);
+            $base64Decoded = base64_decode($reversedBack);
+
+            if ($base64Decoded === false) {
+                break;
+            }
+
+            $decoded = rawurldecode($base64Decoded);
+
+            if ($decoded === '' || $decoded === $current) {
+                break;
+            }
+
+            $current = $decoded;
+            $layers++;
+
+            if ($layers >= self::MAX_LAYERS) {
+                break;
+            }
+        }
+
+        if ($layers === 0) {
+            throw new InvalidArgumentException(
+                "Bu VEX15 formatidagi matn emas (\"VEX15_\" prefiksi topilmadi)."
+            );
+        }
+
+        return $current;
+    }
+}
+
+final class Vex15Cli
+{
+    private const VERSION = '1.0.0';
+
+    public function run(array $argv): int
+    {
+        $args = array_slice($argv, 1);
+
+        if (count($args) === 0) {
+            $this->printHelp();
+            return 0;
+        }
+
+        $command = $args[0];
+
+        switch ($command) {
+            case 'encode':
+                return $this->handleEncode($args);
+
+            case 'decode':
+                return $this->handleDecode($args);
+
+            case '--help':
+            case '-h':
+                $this->printHelp();
+                return 0;
+
+            case '-v':
+            case '--version':
+                $this->printVersion();
+                return 0;
+
+            case '-dev':
+                $this->printDeveloperInfo();
+                return 0;
+
+            default:
+                fwrite(STDERR, "Xatolik: noma'lum buyruq \"{$command}\".\n");
+                fwrite(STDERR, "Yordam uchun: vex15 --help\n");
+                return 1;
+        }
+    }
+
+    private function handleEncode(array $args): int
+    {
+        if (!isset($args[1])) {
+            fwrite(STDERR, "Xatolik: matn kiritilmagan.\n");
+            fwrite(STDERR, "Foydalanish: vex15 encode \"<text>\"\n");
+            return 1;
+        }
+
+        $text = $args[1];
+        echo Vex15::encode($text) . PHP_EOL;
+        return 0;
+    }
+
+    private function handleDecode(array $args): int
+    {
+        if (!isset($args[1])) {
+            fwrite(STDERR, "Xatolik: matn kiritilmagan.\n");
+            fwrite(STDERR, "Foydalanish: vex15 decode \"<text>\"\n");
+            return 1;
+        }
+
+        $text = $args[1];
+
+        try {
+            echo Vex15::decode($text) . PHP_EOL;
+        } catch (InvalidArgumentException $e) {
+            fwrite(STDERR, 'Xatolik: ' . $e->getMessage() . PHP_EOL);
+            return 1;
+        }
+
+        return 0;
+    }
+
+    private function printHelp(): void
+    {
+        $lines = [
+            "VEX15 — Base64 arxitekturasidan ilhomlangan maxsus encoding CLI dasturi",
+            "",
+            "Foydalanish:",
+            "  vex15 encode \"<text>\"     Matnni VEX15 formatiga o'tkazadi",
+            "  vex15 decode \"<text>\"     VEX15 matnini asl holatiga qaytaradi",
+            "  vex15 --help, -h          Ushbu yordam matnini ko'rsatadi",
+            "  vex15 -v, --version       Dastur versiyasini ko'rsatadi",
+            "  vex15 -dev                Developer (dasturchi) ma'lumotini ko'rsatadi",
+            "",
+            "Misollar:",
+            "  vex15 encode \"Hello\"",
+            "  vex15 decode \"VEX15_=8GbsVGS\"",
+            "",
+            "Eslatma: VEX15 — encoding algoritmi, u shifrlash (encryption) emas.",
+            "Chiqish har doim \"VEX15_\" prefiksi bilan boshlanadi.",
+        ];
+
+        echo implode(PHP_EOL, $lines) . PHP_EOL;
+    }
+
+    private function printVersion(): void
+    {
+        echo 'VEX15 version ' . self::VERSION . PHP_EOL;
+    }
+
+    private function printDeveloperInfo(): void
+    {
+        $version = self::VERSION;
+
+        $lines = [
+            "VEX15 Developer Information",
+            "",
+            "Version         : " . $version,
+            "Algorithm       : VEX15",
+            "Language        : PHP",
+            "Author          : OdiDev",
+            "Telegram        : @OdiDev",
+            "License         : MIT",
+            "",
+            "Developer Commands:",
+            "  encode",
+            "  decode",
+        ];
+
+        echo implode(PHP_EOL, $lines) . PHP_EOL;
+    }
+}
+
+$cli = new Vex15Cli();
+exit($cli->run($argv));
